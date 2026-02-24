@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Plus, Trash2, FileText, Download, Building2, Calendar, FileCheck, CircleDollarSign, Percent } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -53,13 +53,13 @@ export default function QuoteGenerator() {
     ],
   });
 
-  const calculateTotal = () => {
+  const calculateTotal = useMemo(() => {
     return data.items.reduce((total, item) => total + (item.quantity * item.unitPrice), 0);
-  };
+  }, [data.items]);
 
-  const calculateCommission = () => {
-    return (calculateTotal() * data.commissionRate) / 100;
-  };
+  const calculateCommission = useMemo(() => {
+    return (calculateTotal * data.commissionRate) / 100;
+  }, [calculateTotal, data.commissionRate]);
 
   const addItem = () => {
     setData({
@@ -199,7 +199,7 @@ export default function QuoteGenerator() {
                       <Label>Comissão (%)</Label>
                       <div className="flex gap-4 items-center">
                         <Input type="number" value={data.commissionRate} onChange={(e) => setData({...data, commissionRate: parseFloat(e.target.value) || 0})} className="w-20" />
-                        <div className="text-sm font-medium text-primary">{formatCurrency(calculateCommission())}</div>
+                        <div className="text-sm font-medium text-primary">{formatCurrency(calculateCommission)}</div>
                       </div>
                     </div>
                   </TabsContent>
@@ -258,7 +258,7 @@ export default function QuoteGenerator() {
                 <div className="mt-6 flex justify-end">
                   <div className="bg-slate-50 p-4 border rounded w-48 text-right">
                     <p className="text-xs text-muted-foreground uppercase">Total Geral</p>
-                    <p className="text-xl font-bold text-primary">{formatCurrency(calculateTotal())}</p>
+                    <p className="text-xl font-bold text-primary">{formatCurrency(calculateTotal)}</p>
                   </div>
                 </div>
                 <div className="mt-8 grid grid-cols-2 gap-4 text-sm">
