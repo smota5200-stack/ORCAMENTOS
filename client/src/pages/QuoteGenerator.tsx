@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
-import { Plus, Trash2, FileText, Download, Building2, Calendar, FileCheck, CircleDollarSign, Percent } from "lucide-react";
+import { Plus, Trash2, FileText, Download, Building2, Calendar, FileCheck, CircleDollarSign, Percent, Phone, Mail, Clock } from "lucide-react";
+import logoImg from "../assets/logo.png";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,6 +26,9 @@ type QuoteData = {
   customCurrency: string;
   anniversaryDate: string;
   validityDate: string;
+  validityDays: string;
+  responsiblePhone: string;
+  responsibleEmail: string;
   paymentTerms: string;
   notes: string;
   commissionRate: number;
@@ -39,6 +43,9 @@ export default function QuoteGenerator() {
     customCurrency: "",
     anniversaryDate: "2025-02-18",
     validityDate: "2025-02-19",
+    validityDays: "30 dias",
+    responsiblePhone: "(11) 98765-4321",
+    responsibleEmail: "vendas@empresa.com.br",
     paymentTerms: "Pagamento 30/60/90 no boleto Bancário, mediante aprovação de crédito",
     notes: "Faturamento direto pelo nosso distribuidor Pars Valores em dólar...",
     commissionRate: 5,
@@ -151,8 +158,18 @@ export default function QuoteGenerator() {
                     <Input type="date" value={data.anniversaryDate} onChange={(e) => setData({...data, anniversaryDate: e.target.value})} />
                   </div>
                   <div className="space-y-2">
-                    <Label>Validade</Label>
-                    <Input type="date" value={data.validityDate} onChange={(e) => setData({...data, validityDate: e.target.value})} />
+                    <Label>Validade (Dias)</Label>
+                    <Input placeholder="Ex: 30 dias" value={data.validityDays} onChange={(e) => setData({...data, validityDays: e.target.value})} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Telefone</Label>
+                    <Input value={data.responsiblePhone} onChange={(e) => setData({...data, responsiblePhone: e.target.value})} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Email</Label>
+                    <Input value={data.responsibleEmail} onChange={(e) => setData({...data, responsibleEmail: e.target.value})} />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -233,11 +250,15 @@ export default function QuoteGenerator() {
               <div className="bg-slate-900 text-white p-8">
                 <div className="flex justify-between items-start">
                   <div><h2 className="text-2xl font-bold">PROPOSTA COMERCIAL</h2><p className="text-slate-400 text-sm">Ref: PROP-{new Date().getFullYear()}</p></div>
-                  <div className="flex gap-2">
-                    <div className="w-8 h-8 bg-white rounded text-red-600 flex items-center justify-center font-bold">A</div>
-                    <div className="w-8 h-8 bg-white rounded p-1 flex flex-wrap">
-                      <div className="w-1/2 h-1/2 bg-red-500"></div><div className="w-1/2 h-1/2 bg-green-500"></div>
-                      <div className="w-1/2 h-1/2 bg-blue-500"></div><div className="w-1/2 h-1/2 bg-yellow-500"></div>
+                  <div className="flex items-center gap-4">
+                    <img src={logoImg} alt="Empresa Logo" className="h-10 w-10 object-contain brightness-0 invert" />
+                    <div className="h-8 w-[1px] bg-slate-700" />
+                    <div className="flex gap-2">
+                      <div className="w-8 h-8 bg-white rounded text-red-600 flex items-center justify-center font-bold">A</div>
+                      <div className="w-8 h-8 bg-white rounded p-1 flex flex-wrap">
+                        <div className="w-1/2 h-1/2 bg-red-500"></div><div className="w-1/2 h-1/2 bg-green-500"></div>
+                        <div className="w-1/2 h-1/2 bg-blue-500"></div><div className="w-1/2 h-1/2 bg-yellow-500"></div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -266,7 +287,18 @@ export default function QuoteGenerator() {
                     <p className="font-bold text-yellow-800">Pagamento</p><p>{data.paymentTerms}</p>
                   </div>
                   <div className="p-3 bg-slate-50 border rounded">
-                    <p className="font-bold text-slate-800">Validade</p><p>{data.validityDate}</p>
+                    <p className="font-bold text-slate-800">Validade da Proposta</p><p>{data.validityDays}</p>
+                  </div>
+                </div>
+                
+                <Separator className="my-6" />
+                
+                <div className="grid grid-cols-2 gap-4 text-[10px] text-slate-500 uppercase tracking-wider">
+                  <div className="flex items-center gap-2">
+                    <Phone className="w-3 h-3" /> {data.responsiblePhone}
+                  </div>
+                  <div className="flex items-center gap-2 justify-end">
+                    <Mail className="w-3 h-3" /> {data.responsibleEmail}
                   </div>
                 </div>
               </div>
