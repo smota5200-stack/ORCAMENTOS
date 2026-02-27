@@ -1,6 +1,8 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Plus, Trash2, FileText, Download, Building2, Calendar, FileCheck, CircleDollarSign, Percent, Phone, Mail, Clock } from "lucide-react";
 import logoImg from "../assets/logo.png";
+import logoMicrosoft from "../assets/logo-microsoft.png";
+import logoP3 from "../assets/logo-p3.png";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,6 +13,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
+import type { Client } from "@shared/schema";
+import { useLocation } from "wouter";
+// @ts-ignore
+import html2pdf from "html2pdf.js";
 
 type LineItem = {
   id: string;
@@ -35,30 +43,87 @@ type QuoteData = {
   items: LineItem[];
 };
 
-export default function QuoteGenerator() {
+// Utility for formatting phone numbers e.g 11999999999 -> (11) 99999-9999
+function formatPhone(phone: string) {
+  if (!phone) return "";
+  const cleaned = ('' + phone).replace(/\D/g, '');
+  if (cleaned.length === 11) {
+    return `(${cleaned.substring(0, 2)}) ${cleaned.substring(2, 7)}-${cleaned.substring(7, 11)}`;
+  } else if (cleaned.length === 10) {
+    return `(${cleaned.substring(0, 2)}) ${cleaned.substring(2, 6)}-${cleaned.substring(6, 10)}`;
+  }
+  return phone;
+}
+
+export default function QuoteGenerator({ params }: { params?: { id?: string } }) {
   const { toast } = useToast();
-  const [data, setData] = useState<QuoteData>({
-    contactName: "Elaine Cristina",
-    currency: "USD",
-    customCurrency: "",
-    anniversaryDate: "2025-02-18",
-    validityDate: "2025-02-19",
-    validityDays: "30 dias",
-    responsiblePhone: "(11) 98765-4321",
-    responsibleEmail: "vendas@empresa.com.br",
-    paymentTerms: "Pagamento 30/60/90 no boleto Bancário, mediante aprovação de crédito",
-    notes: "Faturamento direto pelo nosso distribuidor Pars Valores em dólar...",
-    commissionRate: 5,
-    items: [
-      {
-        id: "1",
-        quantity: 10,
-        description: "Adobe Creative Cloud for Teams - All Apps",
-        unitPrice: 899.00,
-        warranty: "1 Ano",
-      }
-    ],
+  const [, setLocation] = useLocation();
+  const isEditing = !!params?.id;
+
+  const { data: clients = [] } = useQuery<Client[]>({
+    queryKey: ["/api/clients"],
+    queryFn: () => fetch("/api/clients").then(r => r.json()),
   });
+
+  const { data: budgetToEdit, isLoading: loadingBudget } = useQuery({
+    queryKey: [`/api/budgets/${params?.id}`],
+    queryFn: () => fetch(`/api/budgets/${params?.id}`).then(r => r.json()),
+    enabled: isEditing,
+  });
+
+  const [data, setData] = useState<QuoteData>({
+    contactName: "",
+    currency: "BRL",
+    customCurrency: "",
+    anniversaryDate: "",
+    validityDate: "",
+    validityDays: "",
+    responsiblePhone: "",
+    responsibleEmail: "",
+    paymentTerms: "",
+    notes: "",
+    commissionRate: 0,
+    items: [],
+  });
+
+  useEffect(() => {
+    if (budgetToEdit) {
+      // Find client to auto-populate email/phone
+      const client = clients.find(c => c.name === budgetToEdit.clientName);
+
+      let validityDays = "";
+      let parsedValidityDate = "";
+      if (budgetToEdit.validityDate) {
+        parsedValidityDate = new Date(budgetToEdit.validityDate).toISOString().split('T')[0];
+
+        // Try to reverse calculate validity days based on created at (or today as fallback)
+        const createdDate = budgetToEdit.createdAt ? new Date(budgetToEdit.createdAt) : new Date();
+        createdDate.setHours(0, 0, 0, 0);
+        const validDate = new Date(budgetToEdit.validityDate);
+        validDate.setHours(0, 0, 0, 0);
+        const diffDays = Math.round((validDate.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24));
+        validityDays = `${diffDays} dias`;
+      }
+
+      const standardCurrencies = ["BRL", "USD", "EUR"];
+      const isCustomCurrency = budgetToEdit.currency && !standardCurrencies.includes(budgetToEdit.currency);
+
+      setData({
+        contactName: budgetToEdit.clientName || "",
+        currency: isCustomCurrency ? "CUSTOM" : (budgetToEdit.currency || "BRL"),
+        customCurrency: isCustomCurrency ? budgetToEdit.currency : "",
+        anniversaryDate: client?.createdAt ? new Date(client.createdAt).toISOString().split('T')[0] : "",
+        validityDate: parsedValidityDate,
+        validityDays: validityDays,
+        responsiblePhone: client?.phone || "",
+        responsibleEmail: client?.email || "",
+        paymentTerms: budgetToEdit.paymentTerms || "",
+        notes: budgetToEdit.notes || "",
+        commissionRate: 0,
+        items: budgetToEdit.items || [],
+      });
+    }
+  }, [budgetToEdit, clients]);
 
   const calculateTotal = useMemo(() => {
     return data.items.reduce((total, item) => total + (item.quantity * item.unitPrice), 0);
@@ -100,11 +165,92 @@ export default function QuoteGenerator() {
     });
   };
 
+  const generatePDF = async () => {
+    toast({ title: "Gerando PDF...", description: "Aguarde enquanto preparamos o seu arquivo." });
+
+    const element = document.getElementById('prop-document');
+    if (!element) {
+      toast({ title: "Erro", description: "O bloco da proposta não foi encontrado.", variant: "destructive" });
+      return;
+    }
+
+    const filename = `Orcamento_${data.contactName.replace(/[^a-z0-9]/gi, '_') || 'Avulso'}.pdf`;
+
+    const opt = {
+      margin: 10,
+      filename: filename,
+      image: { type: 'jpeg' as 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2 },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' as 'portrait' }
+    };
+
+    try {
+      await html2pdf().from(element).set(opt).save();
+      toast({ title: "Sucesso!", description: `PDF baixado: ${filename}` });
+    } catch (err) {
+      console.error("PDF error:", err);
+      toast({ title: "Erro na geração", description: "Ocorreu um erro ao gerar o PDF.", variant: "destructive" });
+    }
+  };
+
+  const createBudgetMutation = useMutation({
+    mutationFn: async (budgetData: any) => {
+      const url = isEditing ? `/api/budgets/${params.id}` : "/api/budgets";
+      const method = isEditing ? "PUT" : "POST";
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(budgetData),
+      });
+      if (!res.ok) throw new Error("Erro ao salvar orçamento");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/budgets"] });
+      toast({
+        title: "✓ Orçamento Salvo!",
+        description: isEditing ? "O orçamento foi atualizado com sucesso." : "O orçamento foi salvo com sucesso nos seus registros.",
+      });
+      setLocation("/orcamentos");
+    },
+    onError: () => {
+      toast({
+        title: "Erro",
+        description: "Não foi possível salvar o orçamento.",
+        variant: "destructive",
+      });
+    }
+  });
+
   const handleGenerate = () => {
-    toast({
-      title: "✓ Orçamento Validado!",
-      description: "Tudo certo com os dados! O PDF foi gerado com sucesso.",
-    });
+    if (!data.contactName) {
+      toast({ title: "Atenção", description: "Preencha o nome do cliente.", variant: "destructive" });
+      return;
+    }
+
+    let calculatedValidityDate = data.validityDate;
+    const match = data.validityDays.match(/(\d+)/);
+    if (match) {
+      const days = parseInt(match[1]);
+      const start = data.anniversaryDate ? new Date(data.anniversaryDate) : new Date();
+      start.setDate(start.getDate() + days);
+      calculatedValidityDate = start.toISOString().split('T')[0];
+    }
+
+    // Formatting data for API matching schema
+    const budgetPayload = {
+      clientName: data.contactName,
+      title: budgetToEdit?.title || "Orçamento " + new Date().toLocaleDateString('pt-BR'),
+      status: budgetToEdit?.status || "rascunho",
+      totalValue: Math.round(calculateTotal * 100), // integer cents
+      currency: data.currency === "CUSTOM" ? data.customCurrency || "USD" : data.currency,
+      validityDate: calculatedValidityDate,
+      paymentTerms: data.paymentTerms,
+      notes: data.notes,
+      items: data.items,
+    };
+
+    createBudgetMutation.mutate(budgetPayload);
   };
 
   const formatCurrency = (value: number) => {
@@ -128,11 +274,14 @@ export default function QuoteGenerator() {
             <span className="font-heading font-semibold text-lg tracking-tight">Proposify</span>
           </div>
           <div className="flex items-center gap-3">
+            <Button variant="outline" size="sm" onClick={generatePDF}>
+              <Download className="w-4 h-4 mr-2" /> Exportar PDF
+            </Button>
             <Button variant="outline" size="sm" onClick={() => window.print()} data-testid="button-print">
               <FileText className="w-4 h-4 mr-2" /> Imprimir
             </Button>
-            <Button size="sm" onClick={handleGenerate} data-testid="button-generate">
-              <Download className="w-4 h-4 mr-2" /> Gerar PDF
+            <Button size="sm" onClick={handleGenerate} data-testid="button-generate" disabled={createBudgetMutation.isPending}>
+              <Download className="w-4 h-4 mr-2" /> {createBudgetMutation.isPending ? "Salvando..." : "Salvar Orçamento"}
             </Button>
           </div>
         </div>
@@ -149,36 +298,59 @@ export default function QuoteGenerator() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Contato / Empresa</Label>
-                  <Input value={data.contactName} onChange={(e) => setData({...data, contactName: e.target.value})} />
+                  <Label>Contato / Empresa (Cliente)</Label>
+                  <select
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    value={data.contactName}
+                    onChange={(e) => {
+                      const clientName = e.target.value;
+                      const client = clients.find(c => c.name === clientName);
+                      if (client) {
+                        setData({
+                          ...data,
+                          contactName: client.name,
+                          anniversaryDate: client.createdAt ? new Date(client.createdAt).toISOString().split('T')[0] : "",
+                          responsibleEmail: client.email || "",
+                          responsiblePhone: client.phone || "",
+                        });
+                      } else {
+                        setData({ ...data, contactName: clientName });
+                      }
+                    }}
+                  >
+                    <option value="">Selecione um cliente...</option>
+                    {clients.map(c => (
+                      <option key={c.id} value={c.name}>{c.name} {c.company ? `- ${c.company}` : ''}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Aniversário</Label>
-                    <Input type="date" value={data.anniversaryDate} onChange={(e) => setData({...data, anniversaryDate: e.target.value})} />
+                    <Label>Data de Criação</Label>
+                    <Input type="date" value={data.anniversaryDate} onChange={(e) => setData({ ...data, anniversaryDate: e.target.value })} />
                   </div>
                   <div className="space-y-2">
                     <Label>Validade (Dias)</Label>
-                    <Input placeholder="Ex: 30 dias" value={data.validityDays} onChange={(e) => setData({...data, validityDays: e.target.value})} />
+                    <Input placeholder="Ex: 30 dias" value={data.validityDays} onChange={(e) => setData({ ...data, validityDays: e.target.value })} />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Telefone</Label>
-                    <Input value={data.responsiblePhone} onChange={(e) => setData({...data, responsiblePhone: e.target.value})} />
+                    <Input value={data.responsiblePhone} onChange={(e) => setData({ ...data, responsiblePhone: e.target.value })} />
                   </div>
                   <div className="space-y-2">
                     <Label>Email</Label>
-                    <Input value={data.responsibleEmail} onChange={(e) => setData({...data, responsibleEmail: e.target.value})} />
+                    <Input value={data.responsibleEmail} onChange={(e) => setData({ ...data, responsibleEmail: e.target.value })} />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Moeda</Label>
-                    <select 
+                    <select
                       className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                       value={data.currency}
-                      onChange={(e) => setData({...data, currency: e.target.value})}
+                      onChange={(e) => setData({ ...data, currency: e.target.value })}
                     >
                       <option value="USD">USD</option>
                       <option value="BRL">BRL</option>
@@ -189,7 +361,7 @@ export default function QuoteGenerator() {
                   {data.currency === "CUSTOM" && (
                     <div className="space-y-2">
                       <Label>Código</Label>
-                      <Input placeholder="Ex: GBP" value={data.customCurrency} onChange={(e) => setData({...data, customCurrency: e.target.value.toUpperCase()})} />
+                      <Input placeholder="Ex: GBP" value={data.customCurrency} onChange={(e) => setData({ ...data, customCurrency: e.target.value.toUpperCase() })} />
                     </div>
                   )}
                 </div>
@@ -204,18 +376,18 @@ export default function QuoteGenerator() {
                   <TabsContent value="details" className="pt-4 space-y-4">
                     <div className="space-y-2">
                       <Label>Pagamento</Label>
-                      <Input value={data.paymentTerms} onChange={(e) => setData({...data, paymentTerms: e.target.value})} />
+                      <Input value={data.paymentTerms} onChange={(e) => setData({ ...data, paymentTerms: e.target.value })} />
                     </div>
                     <div className="space-y-2">
                       <Label>Notas</Label>
-                      <Textarea rows={3} value={data.notes} onChange={(e) => setData({...data, notes: e.target.value})} />
+                      <Textarea rows={3} value={data.notes} onChange={(e) => setData({ ...data, notes: e.target.value })} />
                     </div>
                   </TabsContent>
                   <TabsContent value="commission" className="pt-4">
                     <div className="bg-primary/5 p-4 rounded-lg border border-primary/10 space-y-2">
                       <Label>Comissão (%)</Label>
                       <div className="flex gap-4 items-center">
-                        <Input type="number" value={data.commissionRate} onChange={(e) => setData({...data, commissionRate: parseFloat(e.target.value) || 0})} className="w-20" />
+                        <Input type="number" value={data.commissionRate} onChange={(e) => setData({ ...data, commissionRate: parseFloat(e.target.value) || 0 })} className="w-20" />
                         <div className="text-sm font-medium text-primary">{formatCurrency(calculateCommission)}</div>
                       </div>
                     </div>
@@ -246,59 +418,78 @@ export default function QuoteGenerator() {
           </div>
 
           <div className="lg:col-span-7 lg:sticky lg:top-24">
-            <Card className="shadow-xl bg-white">
-              <div className="bg-slate-900 text-white p-8">
-                <div className="flex justify-between items-start">
-                  <div><h2 className="text-2xl font-bold">PROPOSTA COMERCIAL</h2><p className="text-slate-400 text-sm">Ref: PROP-{new Date().getFullYear()}</p></div>
-                  <div className="flex items-center gap-4">
-                    <img src={logoImg} alt="Empresa Logo" className="h-10 w-10 object-contain brightness-0 invert" />
-                    <div className="h-8 w-[1px] bg-slate-700" />
-                    <div className="flex gap-2">
-                      <div className="w-8 h-8 bg-white rounded text-red-600 flex items-center justify-center font-bold">A</div>
-                      <div className="w-8 h-8 bg-white rounded p-1 flex flex-wrap">
-                        <div className="w-1/2 h-1/2 bg-red-500"></div><div className="w-1/2 h-1/2 bg-green-500"></div>
-                        <div className="w-1/2 h-1/2 bg-blue-500"></div><div className="w-1/2 h-1/2 bg-yellow-500"></div>
+            <Card className="shadow-xl overflow-hidden">
+              <div id="prop-document" className="bg-white">
+                <div className="text-white p-8" style={{ backgroundColor: '#0f172a' }}>
+                  <div className="flex justify-between items-start">
+                    <div className="flex items-center gap-4">
+                      <div className="bg-white rounded px-1 py-1 flex items-center">
+                        <img src={logoP3} alt="P3" className="h-10 w-10 object-contain" />
+                      </div>
+                      <div>
+                        <h2 className="text-2xl font-bold">PROPOSTA COMERCIAL</h2>
+                        <p className="text-sm" style={{ color: '#94a3b8' }}>
+                          Ref: {budgetToEdit?.id ? `${new Date(budgetToEdit.createdAt || new Date()).getFullYear()}-PROP-${budgetToEdit.id.substring(0, 5).toUpperCase()}` : `${new Date().getFullYear()}-PROP-XXXXX`}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="bg-white rounded px-2 py-1 flex items-center justify-center" style={{ minWidth: '32px', minHeight: '32px' }}>
+                        <svg viewBox="0 0 24 24" fill="#FF0000" className="w-6 h-6">
+                          <path d="M15.1 2H24v20L15.1 2zM8.9 2H0v20L8.9 2zM12 9.4L17.6 22h-3.8l-1.6-4H8.1L12 9.4z" />
+                        </svg>
+                      </div>
+                      <div className="bg-white rounded p-1 flex flex-wrap" style={{ width: '32px', height: '32px' }}>
+                        <div className="w-1/2 h-1/2" style={{ backgroundColor: '#f25022' }}></div><div className="w-1/2 h-1/2" style={{ backgroundColor: '#7fba00' }}></div>
+                        <div className="w-1/2 h-1/2" style={{ backgroundColor: '#00a4ef' }}></div><div className="w-1/2 h-1/2" style={{ backgroundColor: '#ffb900' }}></div>
                       </div>
                     </div>
                   </div>
-                </div>
-                <div className="mt-8 flex justify-between">
-                  <div><p className="text-xs text-slate-400">Cliente</p><p className="font-semibold">{data.contactName}</p></div>
-                  <div className="text-right"><p className="text-xs text-slate-400">Data</p><p>{new Date().toLocaleDateString('pt-BR')}</p></div>
-                </div>
-              </div>
-              <div className="p-8">
-                <Table>
-                  <TableHeader><TableRow><TableHead>Qtd</TableHead><TableHead>Descrição</TableHead><TableHead className="text-right">Total</TableHead></TableRow></TableHeader>
-                  <TableBody>
-                    {data.items.map(item => (
-                      <TableRow key={item.id}><TableCell>{item.quantity}</TableCell><TableCell>{item.description}</TableCell><TableCell className="text-right">{formatCurrency(item.quantity * item.unitPrice)}</TableCell></TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-                <div className="mt-6 flex justify-end">
-                  <div className="bg-slate-50 p-4 border rounded w-48 text-right">
-                    <p className="text-xs text-muted-foreground uppercase">Total Geral</p>
-                    <p className="text-xl font-bold text-primary">{formatCurrency(calculateTotal)}</p>
+                  <div className="mt-8 flex justify-between">
+                    <div><p className="text-xs" style={{ color: '#94a3b8' }}>Cliente</p><p className="font-semibold">{data.contactName}</p></div>
+                    <div className="text-right"><p className="text-xs" style={{ color: '#94a3b8' }}>Data</p><p>{new Date().toLocaleDateString('pt-BR')}</p></div>
                   </div>
                 </div>
-                <div className="mt-8 grid grid-cols-2 gap-4 text-sm">
-                  <div className="p-3 bg-yellow-50 border border-yellow-100 rounded">
-                    <p className="font-bold text-yellow-800">Pagamento</p><p>{data.paymentTerms}</p>
+                <div className="p-8">
+                  <Table>
+                    <TableHeader><TableRow><TableHead>Qtd</TableHead><TableHead>Descrição</TableHead><TableHead className="text-right">Total</TableHead></TableRow></TableHeader>
+                    <TableBody>
+                      {data.items.map(item => (
+                        <TableRow key={item.id}><TableCell>{item.quantity}</TableCell><TableCell>{item.description} {item.warranty ? `(${item.warranty})` : ''}</TableCell><TableCell className="text-right">{formatCurrency(item.quantity * item.unitPrice)}</TableCell></TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                  <div className="mt-6 flex justify-end">
+                    <div className="p-4 border rounded w-48 text-right" style={{ backgroundColor: '#f8fafc' }}>
+                      <p className="text-xs text-muted-foreground uppercase">Total Geral</p>
+                      <p className="text-xl font-bold text-primary">{formatCurrency(calculateTotal)}</p>
+                    </div>
                   </div>
-                  <div className="p-3 bg-slate-50 border rounded">
-                    <p className="font-bold text-slate-800">Validade da Proposta</p><p>{data.validityDays}</p>
+                  <div className="mt-8 grid grid-cols-2 gap-4 text-sm">
+                    <div className="p-3 border rounded" style={{ backgroundColor: '#fefce8', borderColor: '#fef3c7' }}>
+                      <p className="font-bold" style={{ color: '#854d0e' }}>Pagamento</p><p>{data.paymentTerms}</p>
+                    </div>
+                    <div className="p-3 border rounded" style={{ backgroundColor: '#f8fafc' }}>
+                      <p className="font-bold" style={{ color: '#1e293b' }}>Validade da Proposta</p><p>{data.validityDays}</p>
+                    </div>
                   </div>
-                </div>
-                
-                <Separator className="my-6" />
-                
-                <div className="grid grid-cols-2 gap-4 text-[10px] text-slate-500 uppercase tracking-wider">
-                  <div className="flex items-center gap-2">
-                    <Phone className="w-3 h-3" /> {data.responsiblePhone}
-                  </div>
-                  <div className="flex items-center gap-2 justify-end">
-                    <Mail className="w-3 h-3" /> {data.responsibleEmail}
+
+                  {data.notes && (
+                    <div className="mt-4 p-4 border rounded text-sm w-full" style={{ backgroundColor: '#f8fafc' }}>
+                      <p className="font-bold mb-1" style={{ color: '#1e293b' }}>Observações</p>
+                      <p className="whitespace-pre-wrap">{data.notes}</p>
+                    </div>
+                  )}
+
+                  <Separator className="my-6" />
+
+                  <div className="grid grid-cols-2 gap-4 text-[10px] uppercase tracking-wider" style={{ color: '#64748b' }}>
+                    <div className="flex items-center gap-2">
+                      <Phone className="w-3 h-3" /> {formatPhone(data.responsiblePhone)}
+                    </div>
+                    <div className="flex items-center gap-2 justify-end">
+                      <Mail className="w-3 h-3" /> {data.responsibleEmail}
+                    </div>
                   </div>
                 </div>
               </div>
