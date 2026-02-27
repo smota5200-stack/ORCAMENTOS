@@ -146,8 +146,8 @@ export default function Clients() {
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead>Nome</TableHead>
-                                <TableHead>Empresa</TableHead>
+                                <TableHead>Empresa/Pessoa</TableHead>
+                                <TableHead>Contato</TableHead>
                                 <TableHead>Email</TableHead>
                                 <TableHead>Telefone</TableHead>
                                 <TableHead>Cadastro</TableHead>
@@ -237,7 +237,7 @@ export default function Clients() {
                     </DialogHeader>
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div className="space-y-2">
-                            <Label>Nome *</Label>
+                            <Label>Empresa/Pessoa *</Label>
                             <Input
                                 value={form.name}
                                 onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -265,7 +265,7 @@ export default function Clients() {
                             </div>
                         </div>
                         <div className="space-y-2">
-                            <Label>Empresa</Label>
+                            <Label>Contato</Label>
                             <Input
                                 value={form.company || ""}
                                 onChange={(e) => setForm({ ...form, company: e.target.value })}

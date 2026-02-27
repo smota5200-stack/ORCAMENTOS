@@ -30,6 +30,8 @@ type LineItem = {
 
 type QuoteData = {
   contactName: string;
+  company: string;
+  contactDepartment: string;
   currency: string;
   customCurrency: string;
   anniversaryDate: string;
@@ -73,6 +75,8 @@ export default function QuoteGenerator({ params }: { params?: { id?: string } })
 
   const [data, setData] = useState<QuoteData>({
     contactName: "",
+    company: "",
+    contactDepartment: "",
     currency: "BRL",
     customCurrency: "",
     anniversaryDate: "",
@@ -110,6 +114,8 @@ export default function QuoteGenerator({ params }: { params?: { id?: string } })
 
       setData({
         contactName: budgetToEdit.clientName || "",
+        company: client?.company || "",
+        contactDepartment: "",
         currency: isCustomCurrency ? "CUSTOM" : (budgetToEdit.currency || "BRL"),
         customCurrency: isCustomCurrency ? budgetToEdit.currency : "",
         anniversaryDate: client?.createdAt ? new Date(client.createdAt).toISOString().split('T')[0] : "",
@@ -309,6 +315,7 @@ export default function QuoteGenerator({ params }: { params?: { id?: string } })
                         setData({
                           ...data,
                           contactName: client.name,
+                          company: client.company || "",
                           anniversaryDate: client.createdAt ? new Date(client.createdAt).toISOString().split('T')[0] : "",
                           responsibleEmail: client.email || "",
                           responsiblePhone: client.phone || "",
@@ -326,11 +333,21 @@ export default function QuoteGenerator({ params }: { params?: { id?: string } })
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Data de Criação</Label>
+                    <Label>Empresa</Label>
+                    <Input placeholder="Nome da empresa" value={data.company} onChange={(e) => setData({ ...data, company: e.target.value })} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Departamento / Cargo</Label>
+                    <Input placeholder="Ex: TI, Comercial" value={data.contactDepartment} onChange={(e) => setData({ ...data, contactDepartment: e.target.value })} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Data de Envio da Proposta</Label>
                     <Input type="date" value={data.anniversaryDate} onChange={(e) => setData({ ...data, anniversaryDate: e.target.value })} />
                   </div>
                   <div className="space-y-2">
-                    <Label>Validade (Dias)</Label>
+                    <Label>Validade da Proposta</Label>
                     <Input placeholder="Ex: 30 dias" value={data.validityDays} onChange={(e) => setData({ ...data, validityDays: e.target.value })} />
                   </div>
                 </div>
@@ -420,34 +437,65 @@ export default function QuoteGenerator({ params }: { params?: { id?: string } })
           <div className="lg:col-span-7 lg:sticky lg:top-24">
             <Card className="shadow-xl overflow-hidden">
               <div id="prop-document" className="bg-white">
-                <div className="text-white p-8" style={{ backgroundColor: '#0f172a' }}>
-                  <div className="flex justify-between items-start">
+                <div className="text-white" style={{ backgroundColor: '#0f172a' }}>
+                  {/* Top row: Logo + Title + Partner logos */}
+                  <div className="px-6 pt-6 pb-4 flex justify-between items-start">
                     <div className="flex items-center gap-4">
                       <div className="bg-white rounded px-1 py-1 flex items-center">
                         <img src={logoP3} alt="P3" className="h-10 w-10 object-contain" />
                       </div>
                       <div>
-                        <h2 className="text-2xl font-bold">PROPOSTA COMERCIAL</h2>
-                        <p className="text-sm" style={{ color: '#94a3b8' }}>
-                          Ref: {budgetToEdit?.id ? `${new Date(budgetToEdit.createdAt || new Date()).getFullYear()}-PROP-${budgetToEdit.id.substring(0, 5).toUpperCase()}` : `${new Date().getFullYear()}-PROP-XXXXX`}
+                        <h2 className="text-xl font-bold tracking-wide">PROPOSTA COMERCIAL</h2>
+                        <p className="text-xs" style={{ color: '#94a3b8' }}>
+                          Ref: {budgetToEdit?.proposalId
+                            ? `${new Date(budgetToEdit.createdAt || new Date()).getFullYear()}-PROP-${String(budgetToEdit.proposalId).padStart(5, '0')}`
+                            : `${new Date().getFullYear()}-PROP-XXXXX`}
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <div className="bg-white rounded px-2 py-1 flex items-center justify-center" style={{ minWidth: '32px', minHeight: '32px' }}>
-                        <svg viewBox="0 0 24 24" fill="#FF0000" className="w-6 h-6">
+                    <div className="flex items-center gap-5">
+                      <div className="flex items-center gap-2">
+                        <svg viewBox="0 0 24 24" fill="#FF0000" className="w-7 h-7">
                           <path d="M15.1 2H24v20L15.1 2zM8.9 2H0v20L8.9 2zM12 9.4L17.6 22h-3.8l-1.6-4H8.1L12 9.4z" />
                         </svg>
+                        <span className="text-white font-semibold text-sm">Adobe</span>
                       </div>
-                      <div className="bg-white rounded p-1 flex flex-wrap" style={{ width: '32px', height: '32px' }}>
-                        <div className="w-1/2 h-1/2" style={{ backgroundColor: '#f25022' }}></div><div className="w-1/2 h-1/2" style={{ backgroundColor: '#7fba00' }}></div>
-                        <div className="w-1/2 h-1/2" style={{ backgroundColor: '#00a4ef' }}></div><div className="w-1/2 h-1/2" style={{ backgroundColor: '#ffb900' }}></div>
+                      <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap" style={{ width: '20px', height: '20px', gap: '1px' }}>
+                          <div style={{ width: '9px', height: '9px', backgroundColor: '#f25022' }}></div><div style={{ width: '9px', height: '9px', backgroundColor: '#7fba00' }}></div>
+                          <div style={{ width: '9px', height: '9px', backgroundColor: '#00a4ef' }}></div><div style={{ width: '9px', height: '9px', backgroundColor: '#ffb900' }}></div>
+                        </div>
+                        <span className="text-white font-semibold text-sm">Microsoft</span>
                       </div>
                     </div>
                   </div>
-                  <div className="mt-8 flex justify-between">
-                    <div><p className="text-xs" style={{ color: '#94a3b8' }}>Cliente</p><p className="font-semibold">{data.contactName}</p></div>
-                    <div className="text-right"><p className="text-xs" style={{ color: '#94a3b8' }}>Data</p><p>{new Date().toLocaleDateString('pt-BR')}</p></div>
+
+                  {/* Separator */}
+                  <div className="mx-6" style={{ borderTop: '1px solid #1e293b' }}></div>
+
+                  {/* Contact details grid */}
+                  <div className="px-6 py-4 grid grid-cols-3 gap-4 text-sm">
+                    <div>
+                      <p className="font-semibold">Elaine Cristina Silva</p>
+                      <p className="text-xs mt-1" style={{ color: '#cbd5e1' }}>
+                        (11) 94832-7056
+                      </p>
+                    </div>
+                    <div>
+                      <p className="font-semibold">{data.company || data.contactName || '—'}</p>
+                      {data.contactDepartment && (
+                        <p className="text-xs mt-1" style={{ color: '#cbd5e1' }}>
+                          {data.contactName} — {data.contactDepartment}
+                        </p>
+                      )}
+                      <p className="text-xs mt-1" style={{ color: '#cbd5e1' }}>
+                        {[formatPhone(data.responsiblePhone), data.responsibleEmail].filter(Boolean).join(' · ') || '—'}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs mb-1 font-medium" style={{ color: '#94a3b8' }}>Data</p>
+                      <p className="font-semibold">{new Date().toLocaleDateString('pt-BR')}</p>
+                    </div>
                   </div>
                 </div>
                 <div className="p-8">
