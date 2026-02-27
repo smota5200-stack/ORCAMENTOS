@@ -438,9 +438,10 @@ export default function QuoteGenerator({ params }: { params?: { id?: string } })
                   <div key={item.id} className="p-4 border rounded-lg bg-slate-50/50 space-y-3 relative">
                     <Button variant="ghost" size="icon" className="absolute top-2 right-2 h-7 w-7 text-destructive" onClick={() => removeItem(item.id)}><Trash2 className="w-4 h-4" /></Button>
                     <div className="pr-8"><Label className="text-xs">Descrição</Label><Input value={item.description} onChange={(e) => updateItem(item.id, 'description', e.target.value)} className="h-8" /></div>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-4 gap-2">
                       <div><Label className="text-xs">Qtd</Label><Input type="number" value={item.quantity} onChange={(e) => updateItem(item.id, 'quantity', parseInt(e.target.value) || 0)} className="h-8" /></div>
-                      <div><Label className="text-xs">Preço</Label><Input type="number" value={item.unitPrice} onChange={(e) => updateItem(item.id, 'unitPrice', parseFloat(e.target.value) || 0)} className="h-8" /></div>
+                      <div><Label className="text-xs">Preço Unit.</Label><Input type="number" value={item.unitPrice} onChange={(e) => updateItem(item.id, 'unitPrice', parseFloat(e.target.value) || 0)} className="h-8" /></div>
+                      <div><Label className="text-xs">Total</Label><Input value={formatCurrency(item.quantity * item.unitPrice)} readOnly className="h-8 bg-slate-100 font-semibold" /></div>
                       <div><Label className="text-xs">Garantia</Label><Input value={item.warranty} onChange={(e) => updateItem(item.id, 'warranty', e.target.value)} className="h-8" /></div>
                     </div>
                   </div>
