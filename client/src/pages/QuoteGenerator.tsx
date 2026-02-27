@@ -91,7 +91,7 @@ export default function QuoteGenerator({ params }: { params?: { id?: string } })
   });
 
   useEffect(() => {
-    if (budgetToEdit) {
+    if (budgetToEdit && clients.length > 0) {
       // Find client to auto-populate email/phone
       const client = clients.find(c => c.name === budgetToEdit.clientName);
 
@@ -112,13 +112,18 @@ export default function QuoteGenerator({ params }: { params?: { id?: string } })
       const standardCurrencies = ["BRL", "USD", "EUR"];
       const isCustomCurrency = budgetToEdit.currency && !standardCurrencies.includes(budgetToEdit.currency);
 
+      // Fallback date: use budget createdAt if client date is unavailable
+      const sendDate = budgetToEdit.createdAt
+        ? new Date(budgetToEdit.createdAt).toISOString().split('T')[0]
+        : new Date().toISOString().split('T')[0];
+
       setData({
         contactName: budgetToEdit.clientName || "",
         company: client?.company || "",
         contactDepartment: "",
         currency: isCustomCurrency ? "CUSTOM" : (budgetToEdit.currency || "BRL"),
         customCurrency: isCustomCurrency ? budgetToEdit.currency : "",
-        anniversaryDate: client?.createdAt ? new Date(client.createdAt).toISOString().split('T')[0] : "",
+        anniversaryDate: sendDate,
         validityDate: parsedValidityDate,
         validityDays: validityDays,
         responsiblePhone: client?.phone || "",
