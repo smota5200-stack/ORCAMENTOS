@@ -25,6 +25,15 @@ export async function registerRoutes(
   });
 
   // =================== BUDGETS ===================
+  app.get("/api/budgets-next-id", async (_req, res) => {
+    try {
+      const budgets = await storage.getBudgets();
+      const maxId = budgets.reduce((max, b) => Math.max(max, b.proposalId || 0), 0);
+      res.json({ nextId: maxId + 1 });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
   app.get("/api/budgets", async (_req, res) => { res.json(await storage.getBudgets()); });
   app.get("/api/budgets/:id", async (req, res) => {
     const r = await storage.getBudget(req.params.id);

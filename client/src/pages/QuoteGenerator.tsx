@@ -73,6 +73,16 @@ export default function QuoteGenerator({ params }: { params?: { id?: string } })
     enabled: isEditing,
   });
 
+  const { data: nextIdData } = useQuery<{ nextId: number }>({
+    queryKey: ["/api/budgets-next-id"],
+    queryFn: () => fetch("/api/budgets-next-id").then(r => r.json()),
+    enabled: !isEditing,
+  });
+
+  const proposalNumber = isEditing
+    ? (budgetToEdit?.proposalId ? String(budgetToEdit.proposalId).padStart(5, '0') : 'XXXXX')
+    : (nextIdData?.nextId ? String(nextIdData.nextId).padStart(5, '0') : '...');
+
   const [data, setData] = useState<QuoteData>({
     contactName: "",
     company: "",
@@ -342,7 +352,7 @@ export default function QuoteGenerator({ params }: { params?: { id?: string } })
                     <Input placeholder="Nome da empresa" value={data.company} onChange={(e) => setData({ ...data, company: e.target.value })} />
                   </div>
                   <div className="space-y-2">
-                    <Label>Departamento / Cargo</Label>
+                    <Label>A/C (aos cuidados de:)</Label>
                     <Input placeholder="Ex: TI, Comercial" value={data.contactDepartment} onChange={(e) => setData({ ...data, contactDepartment: e.target.value })} />
                   </div>
                 </div>
@@ -452,9 +462,7 @@ export default function QuoteGenerator({ params }: { params?: { id?: string } })
                       <div>
                         <h2 className="text-xl font-bold tracking-wide">PROPOSTA COMERCIAL</h2>
                         <p className="text-xs" style={{ color: '#94a3b8' }}>
-                          Ref: {budgetToEdit?.proposalId
-                            ? `${new Date(budgetToEdit.createdAt || new Date()).getFullYear()}-PROP-${String(budgetToEdit.proposalId).padStart(5, '0')}`
-                            : `${new Date().getFullYear()}-PROP-XXXXX`}
+                          Ref: {new Date().getFullYear()}-PROP-{proposalNumber}
                         </p>
                       </div>
                     </div>
@@ -505,10 +513,24 @@ export default function QuoteGenerator({ params }: { params?: { id?: string } })
                 </div>
                 <div className="p-8">
                   <Table>
-                    <TableHeader><TableRow><TableHead>Qtd</TableHead><TableHead>Descrição</TableHead><TableHead className="text-right">Total</TableHead></TableRow></TableHeader>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Descrição</TableHead>
+                        <TableHead className="text-center">Qtde</TableHead>
+                        <TableHead className="text-right">Preço Unit.</TableHead>
+                        <TableHead className="text-right">Preço Total</TableHead>
+                        <TableHead>Garantia</TableHead>
+                      </TableRow>
+                    </TableHeader>
                     <TableBody>
                       {data.items.map(item => (
-                        <TableRow key={item.id}><TableCell>{item.quantity}</TableCell><TableCell>{item.description} {item.warranty ? `(${item.warranty})` : ''}</TableCell><TableCell className="text-right">{formatCurrency(item.quantity * item.unitPrice)}</TableCell></TableRow>
+                        <TableRow key={item.id}>
+                          <TableCell>{item.description}</TableCell>
+                          <TableCell className="text-center">{item.quantity}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(item.unitPrice)}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(item.quantity * item.unitPrice)}</TableCell>
+                          <TableCell>{item.warranty || '—'}</TableCell>
+                        </TableRow>
                       ))}
                     </TableBody>
                   </Table>

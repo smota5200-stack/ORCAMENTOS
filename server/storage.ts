@@ -184,7 +184,17 @@ export class SupabaseStorage implements IStorage {
     return data ? this.mapBudget(data) : undefined;
   }
   async createBudget(budget: InsertBudget): Promise<Budget> {
+    // Auto-generate sequential proposal_id
+    const { data: maxRow } = await supabase
+      .from('budgets')
+      .select('proposal_id')
+      .order('proposal_id', { ascending: false, nullsFirst: false })
+      .limit(1)
+      .maybeSingle();
+    const nextProposalId = (maxRow?.proposal_id || 0) + 1;
+
     const dbPayload = {
+      proposal_id: nextProposalId,
       client_id: budget.clientId,
       client_name: budget.clientName,
       title: budget.title,

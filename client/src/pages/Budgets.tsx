@@ -176,7 +176,7 @@ export default function Budgets() {
                                         <TableCell className="font-medium">
                                             {b.title}
                                             <div className="text-xs text-muted-foreground font-normal mt-1">
-                                                {new Date(b.createdAt || new Date()).getFullYear()}-PROP-{b.id.substring(0, 5).toUpperCase()}
+                                                {new Date(b.createdAt || new Date()).getFullYear()}-PROP-{b.proposalId ? String(b.proposalId).padStart(5, '0') : b.id.substring(0, 5).toUpperCase()}
                                             </div>
                                         </TableCell>
                                         <TableCell className="text-muted-foreground">{b.clientName}</TableCell>
