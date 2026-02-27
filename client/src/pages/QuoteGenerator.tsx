@@ -561,11 +561,22 @@ export default function QuoteGenerator({ params }: { params?: { id?: string } })
 
                   <div className="grid grid-cols-2 gap-4 text-[10px] uppercase tracking-wider" style={{ color: '#64748b' }}>
                     <div className="flex items-center gap-2">
-                      <Phone className="w-3 h-3" /> {formatPhone(data.responsiblePhone)}
+                      {formatPhone(data.responsiblePhone)}
                     </div>
                     <div className="flex items-center gap-2 justify-end">
-                      <Mail className="w-3 h-3" /> {data.responsibleEmail}
+                      {data.responsibleEmail}
                     </div>
+                  </div>
+
+                  <div className="flex items-center justify-center gap-6 mt-3 text-[10px]" style={{ color: '#64748b' }}>
+                    <a href="https://www.pagina3informatica.com.br" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 no-underline" style={{ color: '#64748b' }}>
+                      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" /></svg>
+                      www.pagina3informatica.com.br
+                    </a>
+                    <a href="https://www.instagram.com/p3info/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 no-underline" style={{ color: '#64748b' }}>
+                      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5" /><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" /><line x1="17.5" y1="6.5" x2="17.51" y2="6.5" /></svg>
+                      @p3info
+                    </a>
                   </div>
                 </div>
               </div>
